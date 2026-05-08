@@ -342,13 +342,26 @@ var result = new HashMap<String, List<UserDTO>>(); // Reduces verbosity
 ## 14. Testing
 
 ### ✅ DO
-- Write tests using JUnit 6
+- Write tests using JUnit 5 (latest stable version)
 - Use Given-When-Then naming convention for test methods
 - Use `@DisplayName` for readable test descriptions
 - Use `@Nested` classes to group related tests
 - Follow AAA pattern (Arrange, Act, Assert)
 - Aim for high code coverage (>80%)
 - Test both happy paths and edge cases
+- Use proper test lifecycle annotations for setup and teardown
+
+### Test Lifecycle Annotations
+
+#### @BeforeEach and @AfterEach
+- Use `@BeforeEach` to set up fresh test state before each test
+- Use `@AfterEach` to clean up after each test
+- Ensures test isolation and prevents state leakage
+
+#### @BeforeAll and @AfterAll
+- Use `@BeforeAll` for expensive one-time setup (static methods)
+- Use `@AfterAll` for one-time cleanup (static methods)
+- Useful for database connections, external services, or file resources
 
 ```java
 @DisplayName("User Service Tests")
@@ -356,11 +369,34 @@ class UserServiceTest {
     
     private UserService userService;
     private UserRepository userRepository;
+    private static TestDatabase testDatabase;
+    
+    @BeforeAll
+    static void setUpClass() {
+        // One-time setup for all tests
+        testDatabase = new TestDatabase();
+        testDatabase.start();
+    }
+    
+    @AfterAll
+    static void tearDownClass() {
+        // One-time cleanup after all tests
+        if (testDatabase != null) {
+            testDatabase.stop();
+        }
+    }
     
     @BeforeEach
     void setUp() {
+        // Setup before each test
         userRepository = mock(UserRepository.class);
         userService = new UserService(userRepository);
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Cleanup after each test
+        reset(userRepository);
     }
     
     @Nested
@@ -460,12 +496,114 @@ Method naming format: `given[Context]_when[Action]_then[Outcome]`
 - Use `@DisplayName` at method level for human-readable test descriptions
 - Nested classes improve test report readability and organization
 
+### Test Lifecycle Best Practices
+
+#### When to Use Each Annotation
+
+**@BeforeEach**
+- Initialize test objects (instances, mocks, test data)
+- Reset shared state between tests
+- Set up common test configuration
+
+**@AfterEach**
+- Clean up resources created in @BeforeEach
+- Reset mocks or shared state
+- Close temporary resources
+
+**@BeforeAll**
+- Start external services (database, message queue)
+- Initialize expensive resources (connection pools, caches)
+- Load large test data sets
+
+**@AfterAll**
+- Stop external services
+- Clean up expensive resources
+- Generate test reports or summaries
+
+#### Example: Complete Test Lifecycle
+
+```java
+@DisplayName("Calculator Integration Tests")
+class CalculatorIntegrationTest {
+    
+    private Calculator calculator;
+    private static TestDatabase testDatabase;
+    private static TestLogger testLogger;
+    
+    @BeforeAll
+    static void initializeTestEnvironment() {
+        // Expensive one-time setup
+        testDatabase = new TestDatabase();
+        testDatabase.initialize();
+        testLogger = new TestLogger("calculator-tests");
+        testLogger.startLogging();
+    }
+    
+    @AfterAll
+    static void cleanupTestEnvironment() {
+        // One-time cleanup
+        if (testLogger != null) {
+            testLogger.stopLogging();
+            testLogger.generateReport();
+        }
+        if (testDatabase != null) {
+            testDatabase.cleanup();
+        }
+    }
+    
+    @BeforeEach
+    void setUpTest() {
+        // Fresh setup for each test
+        calculator = new Calculator();
+        testDatabase.clearTestData();
+        testLogger.logTestStart();
+    }
+    
+    @AfterEach
+    void tearDownTest() {
+        // Cleanup after each test
+        testLogger.logTestEnd();
+        testDatabase.verifyNoLeakedConnections();
+    }
+    
+    @Test
+    @DisplayName("Given calculator, when adding numbers, then return correct sum")
+    void givenCalculator_whenAddingNumbers_thenReturnCorrectSum() {
+        // Given - calculator is already set up in @BeforeEach
+        
+        // When
+        int result = calculator.add(5, 3);
+        
+        // Then
+        assertEquals(8, result);
+    }
+}
+```
+
+### Test Lifecycle Rules
+
+#### ✅ DO
+- Use `@BeforeEach` for instance field initialization
+- Use `@AfterEach` for instance cleanup
+- Use `@BeforeAll/@AfterAll` for static resources
+- Keep setup methods focused and single-purpose
+- Use descriptive names for lifecycle methods
+
+#### ❌ DON'T
+- Mix instance and static setup in the same method
+- Forget to clean up resources in @AfterAll
+- Use @BeforeEach for expensive operations
+- Create dependencies between test methods
+- Skip cleanup when resources are created
+
 ### ❌ DON'T
 - Write tests without clear Given-When-Then structure
 - Use vague test method names like `test1()`, `testUser()`
 - Skip edge cases and error scenarios
 - Write tests that depend on execution order
 - Test multiple unrelated things in a single test method
+- Forget to use proper lifecycle annotations for setup/teardown
+- Mix @BeforeEach and @BeforeAll responsibilities
 
 ---
 
@@ -485,6 +623,8 @@ Before submitting code, verify:
 - [ ] Fields are final where possible
 - [ ] Tests follow Given-When-Then naming
 - [ ] Tests use @DisplayName and @Nested appropriately
+- [ ] Tests use proper lifecycle annotations (@BeforeEach, @AfterEach, @BeforeAll, @AfterAll)
+- [ ] Test setup/teardown is appropriate for resource types
 - [ ] Test coverage is above 80%
 
 ---
